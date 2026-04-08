@@ -1,0 +1,11 @@
+{
+  "kalshiApiKeyId": "YOUR-API-KEY-HERE",
+  "kalshiPrivateKeyPath": "./kalshi-private-key.pem",
+  "displayName": "Your Name",
+  "originalDeposit": 500.00,
+  "watchlistTickers": [
+    "KXCPIYOY-26APR-T3.0",
+    "KXCPIYOY-26APR-T3.1",
+    "KXFEDDECISION-26JUN-H0"
+  ]
+}

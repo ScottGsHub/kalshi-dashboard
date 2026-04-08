@@ -1,0 +1,22 @@
+{
+  "name": "kalshi-dashboard",
+  "version": "1.0.0",
+  "description": "A personal dashboard to track your Kalshi prediction market portfolio",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "refresh": "node export-data.js"
+  },
+  "keywords": [
+    "kalshi",
+    "prediction-markets",
+    "dashboard",
+    "portfolio",
+    "trading"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,26 @@
+# Sensitive configuration (contains API keys)
+config.json
+
+# Private keys
+*.pem
+*.key
+
+# Generated data
+data.json
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*

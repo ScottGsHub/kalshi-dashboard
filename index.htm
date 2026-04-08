@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalshi Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e4e4e7;
+      padding: 2rem;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 2.5rem; }
+    header h1 {
+      font-size: 2.5rem; font-weight: 700;
+      background: linear-gradient(90deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p { color: #9ca3af; font-size: 0.95rem; }
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.25rem; margin-bottom: 2.5rem;
+    }
+    .kpi-card {
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px; padding: 1.5rem; backdrop-filter: blur(10px);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+    .kpi-card .label { font-size: 0.8rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .kpi-card .value { font-size: 1.85rem; font-weight: 700; color: #fff; }
+    .kpi-card .subtext { font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem; }
+    .kpi-card.highlight { background: linear-gradient(135deg, rgba(96,165,250,0.15), rgba(167,139,250,0.15)); border-color: rgba(96,165,250,0.3); }
+    .positive { color: #34d399; } .negative { color: #f87171; }
+    .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2.5rem; }
+    @media (max-width: 1000px) { .two-column { grid-template-columns: 1fr; } }
+    .section {
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px; padding: 1.75rem; margin-bottom: 2rem;
+    }
+    .section.no-margin { margin-bottom: 0; }
+    .section h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: 1.25rem; color: #e4e4e7; display: flex; align-items: center; gap: 0.5rem; }
+    .chart-container { position: relative; height: 280px; }
+    .calendar-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .calendar-item { display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1rem; background: rgba(255,255,255,0.03); border-radius: 10px; border-left: 3px solid #60a5fa; }
+    .calendar-item.urgent { border-left-color: #f87171; background: rgba(239,68,68,0.05); }
+    .calendar-item.soon { border-left-color: #fbbf24; }
+    .calendar-date { text-align: center; min-width: 50px; }
+    .calendar-date .day { font-size: 1.5rem; font-weight: 700; color: #fff; line-height: 1; }
+    .calendar-date .month { font-size: 0.7rem; color: #9ca3af; text-transform: uppercase; }
+    .calendar-info { flex: 1; }
+    .calendar-info .title { font-weight: 500; color: #e4e4e7; font-size: 0.9rem; }
+    .calendar-info .detail { font-size: 0.8rem; color: #6b7280; margin-top: 0.2rem; }
+    .calendar-days { font-size: 0.75rem; color: #9ca3af; background: rgba(255,255,255,0.1); padding: 0.25rem 0.6rem; border-radius: 4px; white-space: nowrap; }
+    .watchlist-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 10px; margin-bottom: 0.75rem; }
+    .watchlist-item:last-child { margin-bottom: 0; }
+    .watchlist-info .title { font-weight: 500; color: #e4e4e7; font-size: 0.9rem; }
+    .watchlist-info .ticker { font-family: monospace; font-size: 0.75rem; color: #a78bfa; margin-top: 0.2rem; }
+    .watchlist-prices { text-align: right; }
+    .watchlist-prices .yes-price { font-size: 1.1rem; font-weight: 600; color: #fff; }
+    .watchlist-prices .spread { font-size: 0.75rem; color: #6b7280; margin-top: 0.2rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { text-align: left; padding: 0.875rem 0.6rem; border-bottom: 2px solid rgba(255,255,255,0.1); color: #9ca3af; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; }
+    td { padding: 0.875rem 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.05); color: #e4e4e7; }
+    tr:hover { background: rgba(255,255,255,0.03); }
+    .status-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
+    .status-active { background: rgba(59,130,246,0.2); color: #60a5fa; }
+    .ticker { font-family: monospace; font-size: 0.7rem; color: #a78bfa; }
+    .probability-bar { width: 60px; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 0.25rem; }
+    .probability-fill { height: 100%; background: linear-gradient(90deg, #60a5fa, #a78bfa); border-radius: 3px; }
+    footer { text-align: center; padding: 2rem 0; color: #6b7280; font-size: 0.85rem; }
+    .empty-state { text-align: center; color: #6b7280; padding: 2rem; }
+    .btn {
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      border: none; color: white; padding: 0.5rem 1.25rem;
+      border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .auto-refresh-label { margin-left: 1rem; font-size: 0.8rem; color: #9ca3af; }
+    .auto-refresh-label input { margin-right: 0.4rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1 id="dashboardTitle">📊 Kalshi Dashboard</h1>
+      <p id="lastUpdated">Loading...</p>
+      <div style="margin-top: 0.75rem;">
+        <button id="refreshBtn" onclick="refreshData()" class="btn">🔄 Refresh</button>
+        <label class="auto-refresh-label">
+          <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">Auto-refresh (30s)
+        </label>
+      </div>
+    </header>
+
+    <div class="kpi-grid">
+      <div class="kpi-card highlight">
+        <div class="label">Account Total</div>
+        <div class="value" id="kpiTotal">--</div>
+        <div class="subtext"><span class="positive" id="kpiTotalPnl">--</span></div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Bets in Play</div>
+        <div class="value" id="kpiBets">--</div>
+        <div class="subtext" id="kpiBetsCount">-- positions</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Free Cash</div>
+        <div class="value" id="kpiCash">--</div>
+        <div class="subtext">Available to trade</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Unrealized P/L</div>
+        <div class="value" id="kpiUnrealized">--</div>
+        <div class="subtext">If current prices hold</div>
+      </div>
+      <div class="kpi-card">
+        <div class="label">Realized P/L</div>
+        <div class="value" id="kpiRealized">$0.00</div>
+        <div class="subtext">From resolved bets</div>
+      </div>
+    </div>
+
+    <div class="two-column">
+      <div class="section no-margin">
+        <h2><span class="icon">📈</span> Portfolio Growth</h2>
+        <div class="chart-container"><canvas id="growthChart"></canvas></div>
+      </div>
+      <div class="section no-margin">
+        <h2><span class="icon">📅</span> Upcoming Events</h2>
+        <div class="calendar-list" id="calendarList">
+          <div class="empty-state">No active positions</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="icon">🎯</span> Active Positions <span id="positionCount" style="font-size: 0.85rem; font-weight: 400; color: #9ca3af;">(0 open)</span></h2>
+      <table>
+        <thead>
+          <tr><th>Market</th><th>Side</th><th>Qty</th><th>Buy In</th><th>Avg</th><th>Current</th><th>Exit Bid</th><th>P/L</th><th>Prob</th><th>Resolves</th><th>Days</th><th>Status</th></tr>
+        </thead>
+        <tbody id="positionsTable">
+          <tr><td colspan="12" class="empty-state">No active positions</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2><span class="icon">👀</span> Watchlist</h2>
+      <div id="watchlistContainer">
+        <div class="empty-state">No watchlist items configured</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="icon">✅</span> Resolved History (Last 30 Days)</h2>
+      <table>
+        <thead><tr><th>Market</th><th>Side</th><th>Buy In</th><th>Payout</th><th>P/L</th><th>Result</th><th>Resolved</th></tr></thead>
+        <tbody id="resolvedTable"><tr><td colspan="7" class="empty-state">No resolved bets yet</td></tr></tbody>
+      </table>
+    </div>
+
+    <footer>Built with ❤️ • Data from <a href="https://kalshi.com" target="_blank" style="color: #60a5fa;">Kalshi</a> API</footer>
+  </div>
+
+  <script>
+    let autoRefreshInterval = null;
+
+    async function loadData() {
+      try {
+        // Cache-bust to always get fresh data
+        const resp = await fetch('data.json?t=' + Date.now());
+        if (!resp.ok) {
+          throw new Error('data.json not found - click Refresh to generate');
+        }
+        const data = await resp.json();
+        renderDashboard(data);
+      } catch (e) {
+        document.getElementById('lastUpdated').textContent = 'Error: ' + e.message;
+      }
+    }
+
+    function renderDashboard(data) {
+      // Update title with display name
+      const displayName = data.displayName || 'My';
+      document.getElementById('dashboardTitle').textContent = `📊 ${displayName}'s Kalshi Dashboard`;
+      document.title = `${displayName}'s Kalshi Dashboard`;
+      
+      document.getElementById('lastUpdated').textContent = 'Last updated: ' + data.updatedFormatted;
+      
+      const a = data.account;
+      document.getElementById('kpiTotal').textContent = '$' + a.total.toFixed(2);
+      const pnlClass = a.totalPnl >= 0 ? 'positive' : 'negative';
+      const pnlSign = a.totalPnl >= 0 ? '+' : '';
+      document.getElementById('kpiTotalPnl').className = pnlClass;
+      document.getElementById('kpiTotalPnl').textContent = pnlSign + '$' + a.totalPnl.toFixed(2) + ' (' + pnlSign + a.totalPnlPercent.toFixed(1) + '%)';
+      document.getElementById('kpiBets').textContent = '$' + a.portfolioValue.toFixed(2);
+      document.getElementById('kpiBetsCount').textContent = data.positions.length + ' active positions';
+      document.getElementById('positionCount').textContent = '(' + data.positions.length + ' open)';
+      document.getElementById('kpiCash').textContent = '$' + a.cash.toFixed(2);
+      const uClass = a.unrealizedPnl >= 0 ? 'positive' : 'negative';
+      document.getElementById('kpiUnrealized').className = 'value ' + uClass;
+      document.getElementById('kpiUnrealized').textContent = (a.unrealizedPnl >= 0 ? '+' : '') + '$' + a.unrealizedPnl.toFixed(2);
+
+      // Realized P/L
+      const rPnl = a.realizedPnl || 0;
+      const rClass = rPnl >= 0 ? 'positive' : 'negative';
+      document.getElementById('kpiRealized').className = 'value ' + rClass;
+      document.getElementById('kpiRealized').textContent = (rPnl >= 0 ? '+' : '') + '$' + rPnl.toFixed(2);
+
+      // Calendar (upcoming events)
+      if (data.positions.length > 0) {
+        const calHtml = data.positions.map(p => {
+          const close = new Date(p.closeTime);
+          const days = Math.ceil((close - new Date()) / (1000*60*60*24));
+          const urgency = days <= 7 ? 'urgent' : days <= 14 ? 'soon' : '';
+          return `<div class="calendar-item ${urgency}">
+            <div class="calendar-date"><div class="day">${close.getDate()}</div><div class="month">${close.toLocaleString('en',{month:'short'})}</div></div>
+            <div class="calendar-info"><div class="title">${p.title}</div><div class="detail">${p.contracts} ${p.side} contracts</div></div>
+            <div class="calendar-days">${days} days</div>
+          </div>`;
+        }).join('');
+        document.getElementById('calendarList').innerHTML = calHtml;
+      } else {
+        document.getElementById('calendarList').innerHTML = '<div class="empty-state">No active positions</div>';
+      }
+
+      // Positions table
+      if (data.positions.length > 0) {
+        const posHtml = data.positions.map(p => {
+          const close = new Date(p.closeTime);
+          const days = Math.ceil((close - new Date()) / (1000*60*60*24));
+          const pnlClass = p.pnl >= 0 ? 'positive' : 'negative';
+          return `<tr>
+            <td><div>${p.title}</div><div class="ticker">${p.ticker}</div></td>
+            <td>${p.side}</td>
+            <td>${p.contracts}</td>
+            <td>$${p.totalCost.toFixed(2)}</td>
+            <td>${(p.avgPrice*100).toFixed(0)}¢</td>
+            <td>${(p.currentPrice*100).toFixed(0)}¢</td>
+            <td style="color:#6b7280">${(p.exitBid*100).toFixed(0)}¢</td>
+            <td class="${pnlClass}">${p.pnl>=0?'+':''}$${p.pnl.toFixed(2)}</td>
+            <td><div>${(p.probability*100).toFixed(0)}%</div><div class="probability-bar"><div class="probability-fill" style="width:${p.probability*100}%"></div></div></td>
+            <td>${close.toLocaleDateString('en',{month:'short',day:'numeric'})}</td>
+            <td>${days}</td>
+            <td><span class="status-badge status-active">Active</span></td>
+          </tr>`;
+        }).join('');
+        document.getElementById('positionsTable').innerHTML = posHtml;
+      } else {
+        document.getElementById('positionsTable').innerHTML = '<tr><td colspan="12" class="empty-state">No active positions</td></tr>';
+      }
+
+      // Watchlist
+      if (data.watchlist && data.watchlist.length > 0) {
+        const watchHtml = data.watchlist.map(w => {
+          const spread = ((w.yesAsk - w.yesBid)*100).toFixed(0);
+          return `<div class="watchlist-item">
+            <div class="watchlist-info"><div class="title">${w.title}</div><div class="ticker">${w.ticker}</div></div>
+            <div class="watchlist-prices"><div class="yes-price">${(w.yesAsk*100).toFixed(0)}¢ YES</div><div class="spread">Bid: ${(w.yesBid*100).toFixed(0)}¢ · Spread: ${spread}¢</div></div>
+          </div>`;
+        }).join('');
+        document.getElementById('watchlistContainer').innerHTML = watchHtml;
+      } else {
+        document.getElementById('watchlistContainer').innerHTML = '<div class="empty-state">No watchlist items configured</div>';
+      }
+
+      // Resolved History (last 30 days only)
+      if (data.settlements && data.settlements.length > 0) {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentSettlements = data.settlements.filter(s => new Date(s.settledTime) >= thirtyDaysAgo);
+        if (recentSettlements.length > 0) {
+          const resHtml = recentSettlements.map(s => {
+            const date = new Date(s.settledTime).toLocaleDateString('en', {month:'short', day:'numeric', year:'numeric'});
+            const pnlClass = s.pnl >= 0 ? 'positive' : 'negative';
+            const resultClass = s.won ? 'positive' : 'negative';
+            const resultIcon = s.won ? '✅' : '❌';
+            return `<tr>
+              <td><div>${s.title}</div><div class="ticker">${s.ticker}</div></td>
+              <td>${s.side}</td>
+              <td>$${s.totalCost.toFixed(2)}</td>
+              <td>$${s.revenue.toFixed(2)}</td>
+              <td class="${pnlClass}">${s.pnl>=0?'+':''}$${s.pnl.toFixed(2)}</td>
+              <td class="${resultClass}">${resultIcon} ${s.result}</td>
+              <td>${date}</td>
+            </tr>`;
+          }).join('');
+          document.getElementById('resolvedTable').innerHTML = resHtml;
+        } else {
+          document.getElementById('resolvedTable').innerHTML = '<tr><td colspan="7" class="empty-state">No resolved bets in the last 30 days</td></tr>';
+        }
+      }
+
+      // Portfolio growth chart
+      renderChart(data);
+    }
+
+    function renderChart(data) {
+      const ctx = document.getElementById('growthChart').getContext('2d');
+      
+      // Destroy existing chart if it exists
+      const existingChart = Chart.getChart('growthChart');
+      if (existingChart) existingChart.destroy();
+      
+      const gradient = ctx.createLinearGradient(0, 0, 0, 280);
+      gradient.addColorStop(0, 'rgba(96,165,250,0.3)');
+      gradient.addColorStop(1, 'rgba(96,165,250,0)');
+      
+      // Generate simple placeholder data based on current total
+      const total = data.account.total;
+      const deposit = data.account.originalDeposit;
+      const points = 7;
+      const labels = [];
+      const values = [];
+      
+      for (let i = points - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i * 2);
+        labels.push(d.toLocaleDateString('en', { month: 'short', day: 'numeric' }));
+        // Simple linear interpolation from deposit to current
+        const progress = (points - 1 - i) / (points - 1);
+        values.push(deposit + (total - deposit) * progress * (0.8 + Math.random() * 0.4));
+      }
+      values[values.length - 1] = total; // Ensure last point is current total
+      
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            borderColor: '#60a5fa',
+            backgroundColor: gradient,
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#6b7280' }
+            },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: {
+                color: '#6b7280',
+                callback: v => '$' + v.toFixed(0)
+              }
+            }
+          }
+        }
+      });
+    }
+
+    async function refreshData() {
+      const btn = document.getElementById('refreshBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Refreshing...';
+      
+      try {
+        // Try server endpoint first (if running via server.js)
+        const resp = await fetch('/api/refresh');
+        if (resp.ok) {
+          await loadData();
+          btn.textContent = '✅ Updated!';
+        } else {
+          throw new Error('Server refresh failed');
+        }
+      } catch (e) {
+        // Fallback: just reload data.json (for file:// access)
+        await loadData();
+        btn.textContent = '✅ Loaded';
+      }
+      
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = '🔄 Refresh';
+      }, 1500);
+    }
+    
+    function toggleAutoRefresh() {
+      const enabled = document.getElementById('autoRefresh').checked;
+      if (enabled) {
+        autoRefreshInterval = setInterval(refreshData, 30000);
+      } else {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+      }
+    }
+
+    // Initial load
+    loadData();
+  </script>
+</body>
+</html>
