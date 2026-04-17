@@ -348,6 +348,21 @@
       const totalData    = points.map(h => h.total);
       const realizedData = points.map(h => h.realizedPnl);
 
+      const noData = points.length <= 1;
+      const noDataMsg = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#6b7280;font-size:0.85rem;text-align:center;padding:1rem;">Not enough data to display.<br>Charts grow as history accumulates.</div>';
+      if (noData) {
+        document.getElementById('growthChart').style.display = 'none';
+        document.getElementById('realizedChart').style.display = 'none';
+        const gc = document.getElementById('growthChart').parentNode;
+        const rc = document.getElementById('realizedChart').parentNode;
+        if (!gc.querySelector('.no-data-msg')) { const d = document.createElement('div'); d.className='no-data-msg'; d.style.height='280px'; d.innerHTML=noDataMsg; gc.appendChild(d); }
+        if (!rc.querySelector('.no-data-msg')) { const d = document.createElement('div'); d.className='no-data-msg'; d.style.height='140px'; d.innerHTML=noDataMsg; rc.appendChild(d); }
+        return;
+      }
+      document.querySelectorAll('.no-data-msg').forEach(el => el.remove());
+      document.getElementById('growthChart').style.display = '';
+      document.getElementById('realizedChart').style.display = '';
+
       // Portfolio Growth Chart (full size, original style)
       const growthCtx = document.getElementById('growthChart').getContext('2d');
       const existingGrowth = Chart.getChart('growthChart');
