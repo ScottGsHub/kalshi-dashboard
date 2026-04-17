@@ -218,8 +218,9 @@
       document.getElementById('kpiRealized').textContent = (rPnl >= 0 ? '+' : '') + '$' + rPnl.toFixed(2);
 
       // Calendar (upcoming events)
-      if (data.positions.length > 0) {
-        const calHtml = data.positions.map(p => {
+      const sortedPositions = [...data.positions].sort((a, b) => new Date(a.closeTime) - new Date(b.closeTime));
+      if (sortedPositions.length > 0) {
+        const calHtml = sortedPositions.map(p => {
           const close = new Date(p.closeTime);
           const days = Math.ceil((close - new Date()) / (1000*60*60*24));
           const urgency = days <= 7 ? 'urgent' : days <= 14 ? 'soon' : '';
@@ -235,8 +236,8 @@
       }
 
       // Positions table
-      if (data.positions.length > 0) {
-        const posHtml = data.positions.map(p => {
+      if (sortedPositions.length > 0) {
+        const posHtml = sortedPositions.map(p => {
           const close = new Date(p.closeTime);
           const days = Math.ceil((close - new Date()) / (1000*60*60*24));
           const pnlClass = p.pnl >= 0 ? 'positive' : 'negative';
@@ -383,9 +384,15 @@
           throw new Error('Server refresh failed');
         }
       } catch (e) {
-        // Fallback: just reload data.json (for file:// access)
+        // Server not running — reload stale data.json and warn user
         await loadData();
-        btn.textContent = '✅ Loaded';
+        btn.textContent = '⚠️ Stale data';
+        const lastUpdated = document.getElementById('lastUpdated');
+        if (lastUpdated) {
+          const current = lastUpdated.textContent;
+          lastUpdated.textContent = current + ' ⚠️ Server not running — data may be outdated. Run: npm start';
+          lastUpdated.style.color = '#f59e0b';
+        }
       }
       
       setTimeout(() => {
