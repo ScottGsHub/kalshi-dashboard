@@ -47,6 +47,10 @@
     .section.no-margin { margin-bottom: 0; }
     .section h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: 1.25rem; color: #e4e4e7; display: flex; align-items: center; gap: 0.5rem; }
     .chart-container { position: relative; height: 280px; }
+    .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .chart-header h2 { margin-bottom: 0; }
+    .scale-select { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e4e4e7; border-radius: 8px; padding: 0.3rem 0.75rem; font-size: 0.8rem; cursor: pointer; outline: none; }
+    .scale-select:hover { background: rgba(255,255,255,0.12); }
     .calendar-list { display: flex; flex-direction: column; gap: 0.75rem; }
     .calendar-item { display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1rem; background: rgba(255,255,255,0.03); border-radius: 10px; border-left: 3px solid #60a5fa; }
     .calendar-item.urgent { border-left-color: #f87171; background: rgba(239,68,68,0.05); }
@@ -131,7 +135,14 @@
 
     <div class="two-column">
       <div class="section no-margin">
-        <h2><span class="icon">📈</span> Portfolio Growth</h2>
+        <div class="chart-header">
+          <h2><span class="icon">📈</span> Portfolio Growth</h2>
+          <select class="scale-select" id="chartScale" onchange="updateCharts()">
+            <option value="weeks">Weeks</option>
+            <option value="months">Months</option>
+            <option value="all" selected>All Time</option>
+          </select>
+        </div>
         <div class="chart-container"><canvas id="growthChart"></canvas></div>
       </div>
       <div class="section no-margin">
@@ -140,6 +151,11 @@
           <div class="empty-state">No active positions</div>
         </div>
       </div>
+    </div>
+
+    <div class="section">
+      <h2><span class="icon">💰</span> Realized P/L</h2>
+      <div class="chart-container"><canvas id="realizedChart"></canvas></div>
     </div>
 
     <div class="section">
@@ -302,70 +318,79 @@
         }
       }
 
-      // Portfolio growth chart
-      renderChart(data);
+      // Store history globally for chart updates
+      window._dashHistory = data.history || [];
+      window._dashDeposit = data.account.originalDeposit;
+      updateCharts();
     }
 
-    function renderChart(data) {
-      const ctx = document.getElementById('growthChart').getContext('2d');
-      
-      // Destroy existing chart if it exists
-      const existingChart = Chart.getChart('growthChart');
-      if (existingChart) existingChart.destroy();
-      
-      const gradient = ctx.createLinearGradient(0, 0, 0, 280);
-      gradient.addColorStop(0, 'rgba(96,165,250,0.3)');
-      gradient.addColorStop(1, 'rgba(96,165,250,0)');
-      
-      // Generate simple placeholder data based on current total
-      const total = data.account.total;
-      const deposit = data.account.originalDeposit;
-      const points = 7;
-      const labels = [];
-      const values = [];
-      
-      for (let i = points - 1; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i * 2);
-        labels.push(d.toLocaleDateString('en', { month: 'short', day: 'numeric' }));
-        // Simple linear interpolation from deposit to current
-        const progress = (points - 1 - i) / (points - 1);
-        values.push(deposit + (total - deposit) * progress * (0.8 + Math.random() * 0.4));
+    function filterHistory(history, scale) {
+      if (!history || history.length === 0) return history;
+      const now = new Date();
+      if (scale === 'weeks') {
+        const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 14);
+        const filtered = history.filter(h => new Date(h.date) >= cutoff);
+        return filtered.length > 0 ? filtered : history;
+      } else if (scale === 'months') {
+        const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 3);
+        const filtered = history.filter(h => new Date(h.date) >= cutoff);
+        return filtered.length > 0 ? filtered : history;
       }
-      values[values.length - 1] = total; // Ensure last point is current total
-      
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            data: values,
-            borderColor: '#60a5fa',
-            backgroundColor: gradient,
-            borderWidth: 3,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 0
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: {
-              grid: { color: 'rgba(255,255,255,0.05)' },
-              ticks: { color: '#6b7280' }
-            },
-            y: {
-              grid: { color: 'rgba(255,255,255,0.05)' },
-              ticks: {
-                color: '#6b7280',
-                callback: v => '$' + v.toFixed(0)
-              }
-            }
-          }
+      return history; // 'all'
+    }
+
+    function updateCharts() {
+      const scale = document.getElementById('chartScale')?.value || 'all';
+      const history = filterHistory(window._dashHistory || [], scale);
+      const deposit = window._dashDeposit || 0;
+      const inceptionDate = new Date('2026-03-13');
+
+      let labels, totalData, realizedData;
+      if (history.length === 0) {
+        labels = ['Inception', 'Today'];
+        totalData = [deposit, deposit];
+        realizedData = [0, 0];
+      } else {
+        const allPoints = [];
+        const firstDate = new Date(history[0].date);
+        if (firstDate > inceptionDate) {
+          allPoints.push({ date: '2026-03-13', total: deposit, realizedPnl: 0 });
         }
+        allPoints.push(...history);
+        labels = allPoints.map(h => {
+          const d = new Date(h.date + 'T12:00:00');
+          return d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+        });
+        totalData = allPoints.map(h => h.total);
+        realizedData = allPoints.map(h => h.realizedPnl);
+      }
+
+      // Portfolio Growth Chart
+      const growthCtx = document.getElementById('growthChart').getContext('2d');
+      const existingGrowth = Chart.getChart('growthChart');
+      if (existingGrowth) existingGrowth.destroy();
+      const growthGradient = growthCtx.createLinearGradient(0,0,0,280);
+      growthGradient.addColorStop(0,'rgba(96,165,250,0.3)');
+      growthGradient.addColorStop(1,'rgba(96,165,250,0)');
+      new Chart(growthCtx, {
+        type: 'line',
+        data: { labels, datasets: [{ data: totalData, borderColor: '#60a5fa', backgroundColor: growthGradient, borderWidth: 3, fill: true, tension: 0.4, pointRadius: totalData.length <= 14 ? 4 : 0, pointBackgroundColor: '#60a5fa' }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => '$' + ctx.parsed.y.toFixed(2) } } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: v => '$'+v } } } }
+      });
+
+      // Realized P/L Chart
+      const realizedCtx = document.getElementById('realizedChart').getContext('2d');
+      const existingRealized = Chart.getChart('realizedChart');
+      if (existingRealized) existingRealized.destroy();
+      const isPositive = (realizedData[realizedData.length - 1] || 0) >= 0;
+      const rColor = isPositive ? '#34d399' : '#f87171';
+      const rGradient = realizedCtx.createLinearGradient(0,0,0,280);
+      rGradient.addColorStop(0, isPositive ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)');
+      rGradient.addColorStop(1, isPositive ? 'rgba(52,211,153,0)' : 'rgba(248,113,113,0)');
+      new Chart(realizedCtx, {
+        type: 'line',
+        data: { labels, datasets: [{ data: realizedData, borderColor: rColor, backgroundColor: rGradient, borderWidth: 3, fill: true, tension: 0.4, pointRadius: realizedData.length <= 14 ? 4 : 0, pointBackgroundColor: rColor }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => (ctx.parsed.y >= 0 ? '+' : '') + '$' + ctx.parsed.y.toFixed(2) } } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: v => (v>=0?'+':'')+v.toFixed(0) } } } }
       });
     }
 
