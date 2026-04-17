@@ -49,6 +49,10 @@
     .chart-container { position: relative; height: 280px; }
     .chart-container.small { height: 140px; margin-top: 1.25rem; }
     .chart-sublabel { font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1.25rem; margin-bottom: 0.4rem; }
+    .chart-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .chart-panel-header h2 { margin-bottom: 0; }
+    .scale-select { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e4e4e7; border-radius: 8px; padding: 0.3rem 0.75rem; font-size: 0.8rem; cursor: pointer; outline: none; }
+    .scale-select:hover { background: rgba(255,255,255,0.12); }
     .calendar-list { display: flex; flex-direction: column; gap: 0.75rem; }
     .calendar-item { display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1rem; background: rgba(255,255,255,0.03); border-radius: 10px; border-left: 3px solid #60a5fa; }
     .calendar-item.urgent { border-left-color: #f87171; background: rgba(239,68,68,0.05); }
@@ -133,7 +137,15 @@
 
     <div class="two-column">
       <div class="section no-margin">
-        <h2><span class="icon">📈</span> Portfolio Growth</h2>
+        <div class="chart-panel-header">
+          <h2><span class="icon">📈</span> Portfolio Growth</h2>
+          <select class="scale-select" id="chartScale" onchange="renderCharts(window._dashHistory||[], window._dashDeposit||0)">
+            <option value="days">Days</option>
+            <option value="weeks">Weeks</option>
+            <option value="months">Months</option>
+            <option value="all" selected>All Time</option>
+          </select>
+        </div>
         <div class="chart-container"><canvas id="growthChart"></canvas></div>
         <div class="chart-sublabel">💰 Realized P/L</div>
         <div class="chart-container small"><canvas id="realizedChart"></canvas></div>
@@ -306,23 +318,41 @@
         }
       }
 
-      renderCharts(data.history || [], data.account.originalDeposit);
+      window._dashHistory = data.history || [];
+      window._dashDeposit = data.account.originalDeposit;
+      renderCharts(window._dashHistory, window._dashDeposit);
+    }
+
+    function filterHistory(history, scale) {
+      if (!history || history.length === 0) return history;
+      const now = new Date();
+      let cutoff = null;
+      if (scale === 'days')   { cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 7); }
+      else if (scale === 'weeks')  { cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 28); }
+      else if (scale === 'months') { cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 3); }
+      if (cutoff) {
+        const filtered = history.filter(h => new Date(h.date) >= cutoff);
+        return filtered.length > 0 ? filtered : history;
+      }
+      return history;
     }
 
     function renderCharts(history, deposit) {
+      const scale = document.getElementById('chartScale')?.value || 'all';
+      const filtered = filterHistory(history, scale);
       const inceptionDate = new Date('2026-03-13');
       let labels, totalData, realizedData;
 
-      if (!history || history.length === 0) {
+      if (!filtered || filtered.length === 0) {
         labels = ['Inception', 'Today'];
         totalData = [deposit, deposit];
         realizedData = [0, 0];
       } else {
         const allPoints = [];
-        if (new Date(history[0].date) > inceptionDate) {
+        if (scale === 'all' && new Date(filtered[0].date) > inceptionDate) {
           allPoints.push({ date: '2026-03-13', total: deposit, realizedPnl: 0 });
         }
-        allPoints.push(...history);
+        allPoints.push(...filtered);
         labels = allPoints.map(h => new Date(h.date + 'T12:00:00').toLocaleDateString('en', { month: 'short', day: 'numeric' }));
         totalData = allPoints.map(h => h.total);
         realizedData = allPoints.map(h => h.realizedPnl);
